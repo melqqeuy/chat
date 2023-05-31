@@ -1,13 +1,18 @@
 package io.github.melqqeuy.chat.client;
 
 import io.github.melqqeuy.chat.server.library.DefaultGUIExceptionHandler;
+import io.github.melqqeuy.network.ServerSocketThreadListener;
+import io.github.melqqeuy.network.SocketThread;
+import io.github.melqqeuy.network.SocketThreadListener;
 
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.io.IOException;
+import java.net.Socket;
 
-public class ChatClientGUI extends JFrame implements ActionListener {
+public class ChatClientGUI extends JFrame implements ActionListener, SocketThreadListener {
 
     public static void main(String[] args) {
         SwingUtilities.invokeLater(new Runnable() {
@@ -62,7 +67,7 @@ public class ChatClientGUI extends JFrame implements ActionListener {
         bottomPanel.add(btnDisconnect, BorderLayout.WEST);
         bottomPanel.add(fieldInput, BorderLayout.CENTER);
         bottomPanel.add(btnSend, BorderLayout.EAST);
-        bottomPanel.setVisible(false);
+        bottomPanel.setVisible(true);
         add(bottomPanel, BorderLayout.SOUTH);
         setVisible(true);
 
@@ -96,21 +101,83 @@ public class ChatClientGUI extends JFrame implements ActionListener {
         }
     }
 
+    private SocketThread socketThread;
+
     private void connect() {
-        upperPanel.setVisible(false);
-        bottomPanel.setVisible(true);
+        try {
+            Socket socket = new Socket(fieldIPAddr.getText(), Integer.parseInt(fieldPort.getText()));
+            socketThread = new SocketThread(this, "SocketThread", socket);
+        } catch (IOException e) {
+            e.printStackTrace();
+            log.append("Exception: " + e.getMessage() + "\n");
+            log.setCaretPosition(log.getDocument().getLength());
+        }
     }
     private void disconnect() {
-        upperPanel.setVisible(true);
-        bottomPanel.setVisible(false);
+        socketThread.close();
     }
     private void sendMsg() {
         String msg = fieldInput.getText();
         if(msg.equals("")) return;
         fieldInput.setText(null);
         fieldInput.requestFocus();
-        log.append(msg + "\n");
+        socketThread.sendMsg(msg);
     }
 
 
+    @Override
+    public void onStartSockedThread(SocketThread socketThread) {
+        SwingUtilities.invokeLater(new Runnable() {
+            @Override
+            public void run() {
+                log.append("Поток сокета запущен.\n");
+                log.setCaretPosition(log.getDocument().getLength());
+            }
+        });
+    }
+
+    @Override
+    public void onStopSockedThread(SocketThread socketThread) {
+        SwingUtilities.invokeLater(new Runnable() {
+            @Override
+            public void run() {
+                log.append("Соединение потеряно.\n");
+                log.setCaretPosition(log.getDocument().getLength());
+            }
+        });
+    }
+
+    @Override
+    public void onReadySockedThread(SocketThread socketThread, Socket socket) {
+        SwingUtilities.invokeLater(new Runnable() {
+            @Override
+            public void run() {
+                log.append("Соединение установлено.\n");
+                log.setCaretPosition(log.getDocument().getLength());
+            }
+        });
+    }
+
+    @Override
+    public void onReceiveStringSocketThread(SocketThread socketThread, Socket socket, String value) {
+        SwingUtilities.invokeLater(new Runnable() {
+            @Override
+            public void run() {
+                log.append(value + "\n");
+                log.setCaretPosition(log.getDocument().getLength());
+            }
+        });
+    }
+
+    @Override
+    public void onExceptionSocketThread(SocketThread socketThread, Socket socket, Exception e) {
+        SwingUtilities.invokeLater(new Runnable() {
+            @Override
+            public void run() {
+                e.printStackTrace();
+                log.append("Exception: " + e.getMessage() + "\n");
+                log.setCaretPosition(log.getDocument().getLength());
+            }
+        });
+    }
 }
